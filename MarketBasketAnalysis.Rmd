@@ -1,0 +1,254 @@
+---
+title: "Market Basket Analysis"
+author: "Rijul Grover"
+date: "22 December 2023"
+output: 
+  html_document:
+   code_folding: hide
+---
+
+```{r setup, message = FALSE, warning = FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Objective: Market Basket Analysis using Association Rules
+#### Steps to achieve: 
+   1. Structure of data, Read data in Transaction Class 
+   2. Summary, Item Frequency and Plots
+   3. Association Rules using Apiori Algorithm
+   4. Analysis on Rules
+   5. Identifying and Removing Redundant Rules
+   6. Plot different Association Graphs
+   7. Association for most frequent item
+   8. Recommendations
+   
+
+```{r Libraries, message = FALSE, warning = FALSE}
+rm(list=ls())
+library(arules)
+library(arulesViz)
+```
+#### Step 1: Structure of data, Read data in Transaction Class
+
+We'll first see how the data is in the given csv file and read it in Transaction Class.
+```{r direct_read, message = FALSE, warning = FALSE}
+products.initial <- read.csv("MarketBasketAnalysis.csv", sep=",", colClasses = "factor")
+
+str(products.initial)
+```
+
+We can see the structure of the data we read using read.csv. This type of data structure can't be used as input to the Apriori algorithm.  
+We need to read data in transaction class which can be done using "read.transactions" of the package "arules" 
+
+```{r transactions_read, message = FALSE, warning = FALSE}
+rm(products.initial)
+
+products = read.transactions("MarketBasketAnalysis.csv", format = "single", sep = ",", cols = c("Transaction", "Product"), header = TRUE)
+```
+
+Observe the structure of the dataset now. Class is of 'transactions'. 
+
+```{r Structure, message = FALSE, warning = FALSE }
+str(products)
+
+inspect(head(products))
+```
+__iteminfo__ contains the list of items present in the dataset. 17 unique items/products are listed in this dataset.
+```{r Items, message = FALSE, warning = FALSE }
+print(products@itemInfo)
+```
+__itemsetInfo__ has the list of transactions. This dataset has 6726 unique transactions. 
+```{r ItemsetInfo, message = FALSE, warning = FALSE}
+head(products@itemsetInfo)
+nrow(products@itemsetInfo)
+```
+
+__data__ is the sparse matix with item number in the first column and the transactions in each row.
+A cell is marked with '|' if an item has a transaction to it and '.' if an item doesn't have a transaction to it.
+```{r itemdata, message = FALSE, warning = FALSE}
+products@data
+```
+
+#### Step 2: Summary, Item Frequency and Plots
+
+We'll have a look at summary of the dataset and do some basic EDA (Exploratory Data Analysis) on these transactions like Frequency of each item, frequency plot.  
+
+__Summary__ gives the below information. 
+
+  1. No. of transactions and no. of items in the dataset. 
+  2. Most Frequent items in the dataset. We can see Magazine is the most frequent item.
+  3. Element Length distribution gives distribution of no. of items vs transaction.  
+     __Ex:__ 4848 transactions have one item and 1192 has 2 items and so on.
+  4. Five number summary for the distribution is given.  
+     50% of the transactions are of one item.
+  5. Extended information gives the labels of items and transactions. 
+```{r Summary, message = FALSE, warning = FALSE}
+summary(products)
+```
+Item density is the total no. of transactions for all items divided by the product of No. of items and No. of transactions. 
+To be simple, in the sparse matrix, total no. of cells with "|" divided by total no. of cells.
+We can see the calculation below. 
+```{r Density, message = FALSE, warning = FALSE}
+itemNoTrans.Total = 0
+for(i in  as.numeric(rownames(products@itemInfo)))
+{
+  itemNo = products@data[i,]
+  itemNoTrans = length(itemNo[itemNo==TRUE])
+  itemNoTrans.Total = itemNoTrans.Total + itemNoTrans
+}
+
+items.density = itemNoTrans.Total / (nrow(products) * ncol(products))
+ 
+print(items.density) 
+```
+Frequency of each item is calculated as no. of times each item is in a transaction/ total no. of transactions.
+We can see the calculation below. 
+```{r Frequency, message = FALSE, warning = FALSE}
+# Transaction list for Item 1
+Item1.Transactions = products@data[5,]
+Item1.Freq = length(Item1.Transactions[Item1.Transactions==TRUE])/length(Item1.Transactions)
+print(Item1.Freq)
+```
+
+
+We can see different Frequency plots below. Magazines are the most frequent items and deodrants are the least frequent items.
+
+```{r FrequencyPlot1, message = FALSE, warning = FALSE}
+itemFrequencyPlot(products)
+```
+  
+Top 5 Frequnt items can be seen below.
+```{r FrequencyPlot2, message = FALSE, warning = FALSE}
+itemFrequencyPlot(products, topN=5)
+#itemFrequencyPlot(products, topN=ncol(products))
+```
+
+Frequnecy plot based on the support can be seen below.  
+
+__Frequency of items with minimum 0.1 support :__
+```{r FrequencyPlot3, message = FALSE, warning = FALSE}
+itemFrequencyPlot(products, support = 0.1)
+```
+
+#### Step 3: Association Rules using Apiori Algorithm
+We passed two parameters to apriori function.   
+ 1. Transactions Dataset  
+ 2. List of parameters.    
+    Minimum Support = 0.01 => Rules should have minimum support of 0.01    
+    Minimum Confidence = 0.1 => Rules should have miniumn confidence of 0.1  
+    Minimum Length = 2 => Minimum length of rule should be 2; which means rule should contains atleast two items involved.  
+    Maximum Length = 5 => Maximum length of rule should be 5; which means rule should contains at max two items involved.
+    
+The default parameters are minimum support of 0.1, minimum confidence of 0.8, maxlen of 10 items
+
+__Support__:  It's the percentage of transactions that contain all of the items in an itemset (e.g., pencil, paper and rubber). The higher the support the more frequently the itemset occurs. Rules with a high support are preferred since they are likely to be applicable to a large number of future transactions.
+
+__Confidence:__ It's the probability that a transaction that contains the items on the left hand side of the rule (in our example, pencil and paper) also contains the item on the right hand side (a rubber). The higher the confidence, the greater the likelihood that the item on the right hand side will be purchased or, in other words, the greater the return rate you can expect for a given rule.
+
+__Lift:__ It's the probability of all of the items in a rule occurring together (otherwise known as the support) divided by the product of the probabilities of the items on the left and right hand side occurring as if there was no association between them. For example, if pencil, paper and rubber occurred together in 2.5% of all transactions, pencil and paper in 10% of transactions and rubber in 8% of transactions, then the lift would be: 0.025/(0.1*0.08) = 3.125. A lift of more than 1 suggests that the presence of pencil and paper increases the probability that a rubber will also occur in the transaction. Overall, lift summarises the strength of association between the products on the left and right hand side of the rule; the larger the lift the greater the link between the two products.
+
+```{r Apriori_Algorithm, message = FALSE, warning = FALSE}
+products.apriori <- apriori(products, parameter=list(support=0.01, confidence = 0.1,  minlen=2, maxlen =5))
+ 
+summary(products.apriori)
+```
+
+#### Step 4: Analysis on Rules
+
+49 rules have created out of which 28 rules involves two items and 21 rules involves three items.
+
+Summary of Quality Measures gives the five point summary of support, confidence, lift. 
+
+We can see the list of rules produced by the algorithm below.
+```{r Rules, message = FALSE, warning = FALSE}
+inspect(products.apriori)
+```
+These are the top 10 frequent item-sets that have a minimum support of 1%.
+```{r Rules_Support_Top, message = FALSE, warning = FALSE}
+inspect(sort(products.apriori, by="support")[1:10])
+```
+These are the top 10 frequent item-sets that have a minimum support of 1% and minimum confidence of 10%.
+```{r Rules_Support_Confidence_Top, message = FALSE, warning = FALSE}
+inspect(sort(products.apriori, by=c("support","confidence"))[1:10])
+```
+These are the top 5 frequent item-sets that have a minimum support of 1% and minimum confidence of 10% sorted in descending order of lift.
+```{r Rules_Lift, message = FALSE, warning = FALSE}
+inspect(sort(products.apriori, by="lift")[1:5])
+```
+ 
+#### Step 5: Identifying and Removing Redundant Rules
+
+
+From the above list of rules, we can see some redundancy.   
+Ex: We can see {Pencils} => {Candy Bar} ; {Toothpaste} => {Candy Bar}; {Pencils, Toothpaste} => {Candy Bar}.    
+This has some amount of redundancy.    
+We can identify and remove redundancy using below commands.  
+```{r Redundant, message = FALSE, warning = FALSE}
+subset.matrix <- is.subset(products.apriori, products.apriori, sparse = FALSE)
+subset.matrix[lower.tri(subset.matrix, diag=T)] <- NA
+redundant <- colSums(subset.matrix, na.rm=T) >= 1
+which(redundant)
+products.apriori.pruned <- products.apriori[!redundant]
+inspect(sort(products.apriori.pruned, by="lift"))
+```
+
+#### Step 6: Plot different Association Graphs
+
+We can also plot these association rules using different graphs. 
+
+__Scatter Plot:__ Plots all rules with Support on x-axis and confidence on y-axes and color represents the Lift.
+Brighter the color, more the lift.  
+We can see top right corner point which has high Support and high confidence but low lift.  
+But we can't see the actual rule in this graph which is a great disadvantage.  
+```{r ScatterPlot, message = FALSE, warning = FALSE}
+plot(products.apriori.pruned)
+```
+
+__Grouped Plot:__ This plots the LHS items and RHS items with lines connecting and bubbles placed on the intersection of LHS and RHS items.  
+Size of the bubble represents Support and color represents the Lift.  
+Compared to Scatterplot this is a better view as it shows the LHS and RHS items and their associations along with support and Lift.    
+But confidence is missed in this graph.
+```{r GroupedPlot, message = FALSE, warning = FALSE}
+plot(products.apriori.pruned,method="group")
+```
+  
+__Graph Plot:__ This plots the Items, associations between the Items are joined with arrows with the bubble in between. Size represents the Support and color represents the lift.    
+There is an interactive version but can't be plotted in the markdown file and hence it's commented.
+```{r GraphPlot, message = FALSE, warning = FALSE}
+#plot(products.apriori.pruned,method="graph",interactive=TRUE,shading=NA)
+plot(products.apriori.pruned,method="graph")
+```
+  
+#### Step 7: Association for most frequent item
+From the Item frequency plot we can see Magazine is the most frequent item and hence it's placed in the center with all other items plotted around it.
+
+We'll see how Magazine is associated to other items.
+```{r Magazine, message = FALSE, warning = FALSE}
+summary(products)
+products.apriori.magazine <- apriori(products, parameter=list(support=0.01, confidence = 0.1,  minlen=2, maxlen =5),
+                            appearance = list(rhs=c("Magazine"), default = "lhs"))
+
+inspect(sort(products.apriori.magazine, by="lift"))
+```
+
+13 rules are produced by the algorithm. We'll plot these rules the graph method and look for some insights.
+We can see this plot is different from the previous graph plot. In this we directly linked the Item Magazine with other Itemsets, whereas in the previous one, we used Items in place of Itemsets.
+
+Width of the arrow represents support and color represents lift. 
+Candy Bar => Magazine has the highest support but relatively low lift.
+
+```{r GraphPlotMagazine, message = FALSE, warning = FALSE, results = "hide"}
+plot(products.apriori.magazine,method="graph",control = list(type="itemsets"))
+```
+
+#### Step 8: Recommendations
+
+In Market Basket Analysis, it is tough to have thresholds for support, confidence and lift values and pick the items falling
+above the threshold.  
+Picking the "appropriate" values for support and confidence can be difficult, as it is very much an unsupervised process.
+It's better to pick these values based on the domain knowledge and looking up on the different association rules produced.   
+In our case, we recommend {Photo Processing, Magazine}, {Greeting Cards, Candy Bar}, {Toothbrush, Perfume} as Itemsets to be combined. 
+
+As said earlier, we can find more appropriate combination of itemsets using the domain knowledge.  
+
+References: https://select-statistics.co.uk/blog/market-basket-analysis-understanding-customer-behaviour/
