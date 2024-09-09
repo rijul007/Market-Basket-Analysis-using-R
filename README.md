@@ -4,7 +4,7 @@
 The objective of this project is to perform Market Basket Analysis using Association Rules to understand customer purchasing behavior and identify product associations.
 
 ## Dataset Used
-The analysis uses a dataset containing transaction information, with each record representing a product purchased in a transaction. The dataset is stored in a CSV file named "MarketBasketAnalysis.csv" and contains two columns: "Transaction" and "Product".
+The analysis uses a dataset containing transaction information, with each record representing a product purchased in a transaction. The dataset is stored in a CSV file named "MarketBasketAnalysis.csv".
 
 ## Analysis Technique
 The project employs Association Rule Mining, specifically using the Apriori algorithm, to discover relationships between products in the transaction dataset. The analysis involves several key steps and tools:
