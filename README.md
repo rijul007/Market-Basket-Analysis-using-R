@@ -49,3 +49,5 @@ Based on the analysis, the following product combinations are recommended for po
 - Toothbrush and Perfume
 
 The project demonstrates the power of **R** and its specialized packages (**`arules`** and **`arulesViz`**) in conducting sophisticated market basket analysis, providing valuable insights for retail strategy and decision-making.
+
+For a detailed view of the analysis and visualizations, you can access the [RPub Document here](https://rpubs.com/Rijul-Grover/1218045).
